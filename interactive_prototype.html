@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fallbacks in Education: secure exams and skills record</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;500;600&family=Roboto:wght@400;500&display=swap">
+<style>
+:root{--bg:#fbfaf7;--card:#fff;--tx:#1b2420;--mut:#5a6862;--bd:#dcd8cf;--ac:#ff6b35;--pri:#1d4d41;--ok:#14683f;--okb:#dff3e8;--wn:#7a5000;--wnb:#fdf0d2;--er:#a12a1b;--erb:#fbe3df;color-scheme:light;box-sizing:border-box}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121715;--card:#1b2320;--tx:#ece9e2;--mut:#a3afa9;--bd:#33403b;--pri:#23765f;--ok:#7bd8a4;--okb:#173a2a;--wn:#f0c36a;--wnb:#3b2f12;--er:#ff9d8f;--erb:#3f1d19;color-scheme:dark}}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 Roboto,system-ui,-apple-system,sans-serif}
+header{position:sticky;top:0;z-index:11;background:var(--bg);border-bottom:1px solid var(--bd);padding:12px 16px 0}
+.w{max-width:900px;margin:0 auto}
+h1,h2,h3{font-family:Raleway,Roboto,sans-serif;font-weight:500;margin:0}
+h1{font-size:1.6rem;line-height:1.2}h2{font-size:1.3rem;margin-bottom:8px}h3{font-size:1.05rem;margin-bottom:4px}
+.sub{margin:2px 0 8px;color:var(--mut);font-size:.88rem}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{flex:none;background:none;border:0;border-bottom:3px solid transparent;padding:8px 14px;font:inherit;color:var(--mut);cursor:pointer}
+nav button[aria-current=page]{color:var(--tx);border-color:var(--ac);font-weight:500}
+main{padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin:0 0 14px}
+p{margin:0 0 8px}.mut{color:var(--mut);font-size:.9rem}.msg{margin-top:8px;font-size:.9rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.b,.g{font:inherit;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--pri)}
+.b{background:var(--pri);color:#fff}.g{background:none;color:var(--tx);border-color:var(--bd)}
+input[type=text],input[type=number],select{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--card);color:var(--tx);max-width:100%}
+.chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:.8rem;background:var(--bd);color:var(--tx)}
+.verified{background:var(--okb);color:var(--ok)}.review{background:var(--wnb);color:var(--wn)}.invalid{background:var(--erb);color:var(--er)}
+.bar{height:10px;background:var(--bd);border-radius:5px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.rec{border-top:1px solid var(--bd);padding:10px 0}
+.code{display:inline-block;font:500 1rem ui-monospace,monospace;letter-spacing:.05em;border:1px dashed var(--ac);border-radius:6px;padding:2px 8px}
+.g3{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.g2 label{font-size:.88rem;color:var(--mut)}.g2 input{width:100%;margin-top:2px}
+.plan-card{border:1px solid var(--bd);border-radius:10px;padding:14px;background:var(--card);display:flex;flex-direction:column;justify:space-between}
+.plan-card.active{border-color:var(--ac);box-shadow:0 0 0 1px var(--ac)}
+.tot{font:500 1.8rem/1.2 Raleway,sans-serif;color:var(--pri)}
+.rubric-row{display:grid;grid-template-columns:1fr auto;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd);align-items:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="w">
+    <h1>Fallbacks in Education</h1>
+    <p class="sub">Secure exams, practical skills tests, portable records & institutional plans.</p>
+    <nav id="nav" aria-label="Sections"></nav>
+  </div>
+</header>
+<main class="w" id="app"></main>
+
+<script>
+const KEY="fallbacks-prototype-v2",$=s=>document.querySelector(s),
+esc=s=>String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])),
+nm=s=>String(s||"").trim().toLowerCase(),
+fmt=s=>Math.floor(s/60)+":"+String(s%60).padStart(2,"0"),
+rid=n=>(Math.random().toString(36)+"000000").slice(2,2+n).toUpperCase(),
+kes=n=>"KES "+Math.round(n).toLocaleString("en-KE"),
+num=n=>Math.round(n).toLocaleString("en-KE"),
+kshort=n=>n>=1e6?"KES "+(n/1e6).toFixed(1)+"M":kes(n);
+
+// Encapsulated Questions & Rubrics (Server Logic)
+const SERVER = {
+  BANK: {
+    Electronics: [
+      {q:"Which unit measures electrical resistance?", o:["Ohm","Volt","Ampere","Watt"], a:0},
+      {q:"In a series circuit, current through each component is...", o:["The same","Halved","Zero","Doubled"], a:0},
+      {q:"Which component stores electric charge?", o:["Capacitor","Resistor","Diode","Fuse"], a:0},
+      {q:"What current flows when 12 V is applied across 4 Ω?", o:["3 A","48 A","0.33 A","8 A"], a:0}
+    ],
+    ICT: [
+      {q:"Which password exhibits the highest complexity?", o:["r7!Kq#29vLm@","password123","Nairobi2020","qwerty"], a:0},
+      {q:"What is the core mechanism of a phishing email?", o:["Trick user for credentials","Speed up PC","Back up files","Update OS"], a:0},
+      {q:"Which software component directly stores actively executing programs?", o:["RAM","Hard Drive","Wi-Fi Card","CPU Cache"], a:0},
+      {q:"What primary network threat does a firewall mitigate?", o:["Unauthorized network access","Power surges","Dust","Slow typing"], a:0}
+    ]
+  },
+  RUBRICS: {
+    "Soldering & Circuit Assembly": ["Safety & PPE Standards", "Solder Joint Quality & Cleanliness", "Polarity & Component Orientation", "Circuit Operational Test", "Tool Maintenance & Workplace Cleanliness"],
+    "Network Cabling": ["Cable Standard Specification", "Connector Crimping Precision", "Continuity & Wiremap Test Pass", "End-to-End Labeling", "Testing Documentation"]
+  }
+};
+
+// Subscription Plans Specification
+const PLANS = {
+  ind: { id:"ind", name:"Individual Subscription", price:4000, seats:1, desc:"For independent lecturers, tutors, or private assessors.", caps:["1 Educator Seat","200 Active Students","Standard Exam Monitoring","Item Bank Creation"] },
+  dept: { id:"dept", name:"Departmental Subscription", price:30000, seats:10, desc:"For academic departments & specialized faculties.", caps:["Up to 10 Educator Seats","Shared Departmental Item Bank","Custom Practical Rubrics","Skills Gap & Analytics Dashboard"] },
+  inst: { id:"inst", name:"Institutional Subscription", price:120000, seats:100, desc:"For entire colleges, TVETs, and universities.", caps:["Up to 100 Educator Seats","Full LMS Integration (Moodle/Canvas)","Custom Employer Rubrics","Enterprise Audit & Security Logs"] }
+};
+
+const BM_DEFAULTS = {
+  plan:"dept",
+  ind_qty:150, dept_qty:30, inst_qty:10,
+  learners:30000, exams_per_year:4, exam_fee:25, learner_fee:200
+};
+
+function seed(){
+  return {
+    tab:"learner", name:"Amani Wanjiru", last:null, bm:{...BM_DEFAULTS}, offlineQueue:[],
+    recs:[
+      {id:1, name:"Amani Wanjiru", kind:"Exam", title:"Electronics", score:4, total:4, status:"verified", code:"FB-AMANI1", date:"2026-10-10T09:00:00Z", flags:[]},
+      {id:2, name:"Amani Wanjiru", kind:"Practical", title:"Soldering & Circuit Assembly", score:22, total:25, status:"verified", code:"FB-SOLD01", date:"2026-10-12T09:00:00Z", flags:[]},
+      {id:3, name:"Brian Otieno", kind:"Exam", title:"ICT", score:2, total:4, status:"review", code:"FB-REVW01", date:"2026-10-14T09:00:00Z", flags:["Left exam tab (x2)","Paste attempt blocked"]}
+    ]
+  };
+}
+
+function load(){
+  try{
+    const j=localStorage.getItem(KEY);
+    if(j){ const o=JSON.parse(j); o.bm={...BM_DEFAULTS,...o.bm}; return o; }
+  }catch(e){}
+  return seed();
+}
+
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(S)); }catch(e){} }
+
+let S=load(), E=null, T=null;
+
+const nid=()=>Math.max(0,...S.recs.map(r=>r.id))+1;
+const genCode=()=>{ let c; do{ c="FB-"+rid(6); }while(S.recs.some(r=>r.code===c)); return c; };
+
+// Business Model Calculations
+function calcBM(){
+  const B=S.bm;
+  const rev_ind = B.ind_qty * PLANS.ind.price;
+  const rev_dept = B.dept_qty * PLANS.dept.price;
+  const rev_inst = B.inst_qty * PLANS.inst.price;
+  const rev_subs = rev_ind + rev_dept + rev_inst;
+  
+  const rev_learner_base = B.learners * B.learner_fee;
+  const rev_exams = B.learners * B.exams_per_year * B.exam_fee;
+  const rev_usage = rev_learner_base + rev_exams;
+  
+  const total_rev = rev_subs + rev_usage;
+  const total_educators = (B.ind_qty * PLANS.ind.seats) + (B.dept_qty * PLANS.dept.seats) + (B.inst_qty * PLANS.inst.seats);
+  
+  return { rev_ind, rev_dept, rev_inst, rev_subs, rev_learner_base, rev_exams, rev_usage, total_rev, total_educators };
+}
+
+// Views
+function vLearner(){
+  const L=S.last&&S.recs.find(r=>r.id===S.last);
+  const myRecs=S.recs.filter(r=>nm(r.name)===nm(S.name));
+  return `
+    <div class="card">
+      <h2>Learner Portal</h2>
+      <p class="mut">Take a secure monitored exam or view your verified skills record.</p>
+      <div class="row">
+        <input id="nm" type="text" placeholder="Your full name" value="${esc(S.name)}" maxlength="40">
+        <select id="tp">${Object.keys(SERVER.BANK).map(k=>`<option>${k}</option>`).join("")}</select>
+        <button class="b" data-act="start">Start Secure Exam</button>
+      </div>
+    </div>
+    ${L?`<div class="card"><h2>Latest Exam Result</h2><p>Score: <b>${L.score}/${L.total}</b> — Status: <span class="chip ${L.status}">${L.status}</span></p>${L.code?`<p>Verification Code: <span class="code">${L.code}</span></p>`:""}</div>`:""}
+    <div class="card">
+      <h2>My Verified Credentials</h2>
+      ${myRecs.length?myRecs.map(r=>`
+        <div class="rec row">
+          <div style="flex:1">
+            <b>${esc(r.title)}</b> <span class="chip">${r.kind}</span> <span class="chip ${r.status}">${r.status}</span>
+            <div class="mut">${r.score} of ${r.total} points · Billed via learner subscription</div>
+          </div>
+          ${r.code?`<div>Code: <span class="code">${r.code}</span></div>`:""}
+        </div>
+      `).join(""):`<p class="mut">No records found for "${esc(S.name)}".</p>`}
+    </div>
+  `;
+}
+
+function vSchool(){
+  const pend = S.recs.filter(r=>r.status==="review");
+  const rubKeys = Object.keys(SERVER.RUBRICS);
+  return `
+    <div class="card">
+      <h2>Integrity Review Queue</h2>
+      ${pend.length?pend.map(r=>`
+        <div class="rec">
+          <b>${esc(r.name)}</b> — ${esc(r.title)}
+          <div class="mut">Flags: ${r.flags.map(f=>esc(f)).join("; ")}</div>
+          <div class="row" style="margin-top:6px">
+            <button class="b" data-act="approve" data-id="${r.id}">Verify Record</button>
+            <button class="g" data-act="invalidate" data-id="${r.id}">Invalidate</button>
+          </div>
+        </div>
+      `).join(""):`<p class="mut">No exams currently require integrity review.</p>`}
+    </div>
+
+    <div class="card">
+      <h2>Record Practical Skill (1–5 Rubric Scale)</h2>
+      <p class="mut">Evaluates student against employer-informed competencies (5 criteria, 1 to 5 points each = Max 25).</p>
+      <div class="row">
+        <input id="pn" type="text" placeholder="Learner name" value="${esc(S.name)}">
+        <select id="ps">${rubKeys.map(k=>`<option>${esc(k)}</option>`).join("")}</select>
+      </div>
+      <div id="rubricContainer" style="margin:12px 0"></div>
+      <div class="row">
+        <button class="b" data-act="savePrac">Record Evaluation</button>
+        <button class="g" data-act="queueOffline">Queue Offline (Low-Sync)</button>
+      </div>
+      <div id="pmsg" class="msg"></div>
+    </div>
+
+    ${S.offlineQueue.length?`
+      <div class="card">
+        <h2>Offline Queue (${S.offlineQueue.length} Pending)</h2>
+        <p class="mut">Evaluations saved locally in low-connectivity areas.</p>
+        <button class="b" data-act="syncOffline">Sync All Queued Records</button>
+      </div>
+    `:""}
+  `;
+}
+
+function vEmployer(){
+  return `
+    <div class="card">
+      <h2>Verify Credential Code</h2>
+      <p class="mut">Enter the portable skill record code provided by a candidate.</p>
+      <div class="row">
+        <input id="vc" type="text" placeholder="FB-XXXXXX" maxlength="12" style="text-transform:uppercase">
+        <button class="b" data-act="verifyCode">Verify</button>
+        <button class="g" data-act="sampleCode">Load Sample Code</button>
+      </div>
+      <div id="vr" class="msg"></div>
+    </div>
+  `;
+}
+
+function vModel(){
+  const B = S.bm;
+  const calc = calcBM();
+
+  return `
+    <div class="card">
+      <h2>Platform Subscription Tiers</h2>
+      <p class="mut">Educators and institutions select a subscription tier for authoring, exam management, and analytics.</p>
+      
+      <div class="g3" style="margin-top:12px">
+        ${Object.values(PLANS).map(p=>`
+          <div class="plan-card ${B.plan===p.id?'active':''}">
+            <div>
+              <h3>${p.name}</h3>
+              <div class="tot" style="font-size:1.4rem;margin:4px 0">${kes(p.price)} <span style="font-size:.8rem;color:var(--mut)">/ year</span></div>
+              <p class="mut" style="font-size:.85rem">${p.desc}</p>
+              <ul style="padding-left:18px;margin:8px 0;font-size:.85rem">
+                ${p.caps.map(c=>`<li>${c}</li>`).join("")}
+              </ul>
+            </div>
+            <button class="${B.plan===p.id?'b':'g'}" data-act="setPlan" data-v="${p.id}" style="width:100%;margin-top:8px">
+              ${B.plan===p.id?'Selected Tier':'Select Tier'}
+            </button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Revenue Model & Projections</h2>
+      <div class="tot">${kshort(calc.total_rev)} <span style="font-size:.9rem;color:var(--mut)">projected annual revenue</span></div>
+      <p class="mut">Combines recurring institutional access subscriptions with usage-based assessment fees.</p>
+
+      <div style="margin:14px 0">
+        <div class="rec row">
+          <b>Individual Subscriptions (${num(B.ind_qty)})</b>
+          <span class="mut">${kes(PLANS.ind.price)} / year</span>
+          <span style="margin-left:auto"><b>${kes(calc.rev_ind)}</b></span>
+        </div>
+        <div class="rec row">
+          <b>Departmental Subscriptions (${num(B.dept_qty)})</b>
+          <span class="mut">${kes(PLANS.dept.price)} / year</span>
+          <span style="margin-left:auto"><b>${kes(calc.rev_dept)}</b></span>
+        </div>
+        <div class="rec row">
+          <b>Institutional Subscriptions (${num(B.inst_qty)})</b>
+          <span class="mut">${kes(PLANS.inst.price)} / year</span>
+          <span style="margin-left:auto"><b>${kes(calc.rev_inst)}</b></span>
+        </div>
+        <div class="rec row" style="background:var(--bg);padding:8px">
+          <b>Subtotal Platform Subscriptions</b>
+          <span style="margin-left:auto"><b>${kes(calc.rev_subs)}</b></span>
+        </div>
+      </div>
+
+      <div style="margin:14px 0">
+        <div class="rec row">
+          <b>Base Student Enrollment Fees (${num(B.learners)} learners)</b>
+          <span class="mut">${kes(B.learner_fee)} / learner / yr</span>
+          <span style="margin-left:auto"><b>${kes(calc.rev_learner_base)}</b></span>
+        </div>
+        <div class="rec row">
+          <b>Secure Exam Billed Usage (${num(B.learners * B.exams_per_year)} exams)</b>
+          <span class="mut">${kes(B.exam_fee)} / exam</span>
+          <span style="margin-left:auto"><b>${kes(calc.rev_exams)}</b></span>
+        </div>
+        <div class="rec row" style="background:var(--bg);padding:8px">
+          <b>Subtotal Usage-Based Fees</b>
+          <span style="margin-left:auto"><b>${kes(calc.rev_usage)}</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Adjust Financial Model Parameters</h2>
+      <div class="g2">
+        <label>Individual Subscriptions Sold<input type="number" data-bm="ind_qty" value="${B.ind_qty}"></label>
+        <label>Departmental Subscriptions Sold<input type="number" data-bm="dept_qty" value="${B.dept_qty}"></label>
+        <label>Institutional Subscriptions Sold<input type="number" data-bm="inst_qty" value="${B.inst_qty}"></label>
+        <label>Active Learners Enrolled<input type="number" data-bm="learners" value="${B.learners}"></label>
+        <label>Exams Taken Per Learner/Year<input type="number" data-bm="exams_per_year" value="${B.exams_per_year}"></label>
+        <label>Secure Exam Unit Fee (KES)<input type="number" data-bm="exam_fee" value="${B.exam_fee}"></label>
+      </div>
+    </div>
+  `;
+}
+
+function renderRubric(){
+  const ps = $("#ps")?$("#ps").value:"Soldering & Circuit Assembly";
+  const crits = SERVER.RUBRICS[ps]||SERVER.RUBRICS["Soldering & Circuit Assembly"];
+  const container = $("#rubricContainer");
+  if(!container) return;
+  
+  container.innerHTML = crits.map((c,i)=>`
+    <div class="rubric-row">
+      <div style="font-size:.9rem">${i+1}. ${esc(c)}</div>
+      <select data-rubric="${i}" style="width:120px">
+        <option value="1">1 - Beginner</option>
+        <option value="2">2 - Basic</option>
+        <option value="3" selected>3 - Competent</option>
+        <option value="4">4 - Proficient</option>
+        <option value="5">5 - Mastered</option>
+      </select>
+    </div>
+  `).join("");
+}
+
+function render(){
+  const tabs=[["learner","Learner Portal"],["school","School Assessor"],["employer","Employer Verification"],["model","Business Model"]];
+  $("#nav").innerHTML=tabs.map(([k,l])=>`<button data-act="tab" data-v="${k}"${S.tab===k?' aria-current="page"':""}>${l}</button>`).join("");
+  
+  const viewMap = { learner:vLearner, school:vSchool, employer:vEmployer, model:vModel };
+  $("#app").innerHTML = (viewMap[S.tab]||vLearner)();
+  
+  if(S.tab==="school") renderRubric();
+}
+
+// Handlers
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-act]");
+  if(!b) return;
+  const act=b.dataset.act, val=b.dataset.v, id=+b.dataset.id;
+
+  if(act==="tab"){ S.tab=val; save(); render(); }
+  if(act==="setPlan"){ S.bm.plan=val; save(); render(); }
+  
+  if(act==="start"){
+    const name = $("#nm").value.trim();
+    if(!name){ alert("Please enter your name."); return; }
+    S.name = name;
+    alert("Exam mode initialized under secure browser session.");
+    const score = Math.floor(Math.random()*2)+3;
+    const r = { id:nid(), name:S.name, kind:"Exam", title:$("#tp").value, score, total:4, status:"verified", code:genCode(), date:new Date().toISOString(), flags:[] };
+    S.recs.push(r); S.last=r.id; save(); render();
+  }
+
+  if(act==="savePrac" || act==="queueOffline"){
+    const name = $("#pn").value.trim();
+    if(!name){ $("#pmsg").textContent="Enter learner name."; return; }
+    const ps = $("#ps").value;
+    const selects = [...document.querySelectorAll("[data-rubric]")];
+    const totalScore = selects.reduce((sum, el)=>sum + parseInt(el.value), 0);
+    const pass = totalScore >= 15;
+
+    const rec = { id:nid(), name, kind:"Practical", title:ps, score:totalScore, total:25, status:pass?"verified":"fail", code:pass?genCode():"", date:new Date().toISOString(), flags:[] };
+
+    if(act==="queueOffline"){
+      S.offlineQueue.push(rec);
+      $("#pmsg").innerHTML = `<span class="chip review">Queued Offline</span> Saved to local device buffer.`;
+    } else {
+      S.recs.push(rec);
+      $("#pmsg").innerHTML = `<span class="chip verified">Recorded</span> Score: ${totalScore}/25. Code: <span class="code">${rec.code||'N/A'}</span>`;
+    }
+    save(); render();
+  }
+
+  if(act==="syncOffline"){
+    S.recs.push(...S.offlineQueue);
+    S.offlineQueue = [];
+    save(); render();
+    alert("All offline records synced successfully.");
+  }
+
+  if(act==="approve"){ const r=S.recs.find(x=>x.id===id); if(r){ r.status="verified"; save(); render(); } }
+  if(act==="invalidate"){ const r=S.recs.find(x=>x.id===id); if(r){ r.status="invalidated"; save(); render(); } }
+
+  if(act==="verifyCode"){
+    const code = $("#vc").value.trim().toUpperCase();
+    const r = S.recs.find(x=>x.code===code);
+    const o = $("#vr");
+    if(!r){ o.innerHTML = `<span class="chip invalid">Invalid Code</span> No credential found matching ${esc(code)}.`; return; }
+    o.innerHTML = `<div class="card" style="margin-top:8px"><span class="chip ${r.status}">${r.status}</span><h3>${esc(r.name)}</h3><p>${esc(r.title)} (${r.kind}) — Score: ${r.score}/${r.total}</p></div>`;
+  }
+
+  if(act==="sampleCode"){
+    const r = S.recs.find(x=>x.code);
+    if(r){ $("#vc").value = r.code; }
+  }
+});
+
+document.addEventListener("change", e=>{
+  if(e.target.id==="ps") renderRubric();
+});
+
+document.addEventListener("input", e=>{
+  const k = e.target.dataset && e.target.dataset.bm;
+  if(k){ S.bm[k] = Math.max(0, parseFloat(e.target.value)||0); save(); render(); }
+});
+
+render();
+</script>
+</body>
+</html>
